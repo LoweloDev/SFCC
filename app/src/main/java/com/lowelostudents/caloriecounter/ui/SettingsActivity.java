@@ -1,21 +1,21 @@
 package com.lowelostudents.caloriecounter.ui;
 
 import android.os.Bundle;
-import android.util.Log;
-import android.view.View;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
+
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.preference.EditTextPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
+
 import com.lowelostudents.caloriecounter.R;
 import com.lowelostudents.caloriecounter.models.entities.User;
 import com.lowelostudents.caloriecounter.ui.viewmodels.UserViewModel;
+
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 
+// TODO BRÖKEN
 public class SettingsActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,7 +49,7 @@ public class SettingsActivity extends AppCompatActivity {
                         calories.setText(String.valueOf(user.getCalTotal()));
                         this.user = user;
                     }
-            );
+            ).dispose();
 
             name.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
                 @Override

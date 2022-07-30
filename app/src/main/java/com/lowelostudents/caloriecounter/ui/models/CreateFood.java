@@ -3,7 +3,6 @@ package com.lowelostudents.caloriecounter.ui.models;
 import android.app.Activity;
 import android.content.Context;
 import android.os.Bundle;
-import android.text.TextUtils;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
@@ -16,14 +15,12 @@ import androidx.lifecycle.ViewModelProvider;
 
 import com.lowelostudents.caloriecounter.databinding.ActivityCreatefoodBinding;
 import com.lowelostudents.caloriecounter.enums.ActivityMode;
-import com.lowelostudents.caloriecounter.enums.NutrientMode;
 import com.lowelostudents.caloriecounter.models.entities.Food;
-import com.lowelostudents.caloriecounter.models.entities.Nutrients;
 import com.lowelostudents.caloriecounter.services.EventHandlingService;
 import com.lowelostudents.caloriecounter.services.NutrientService;
+import com.lowelostudents.caloriecounter.services.OpenFoodFactsService;
 import com.lowelostudents.caloriecounter.ui.viewmodels.FoodViewModel;
 
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 
@@ -39,7 +36,7 @@ public class CreateFood extends AppCompatActivity {
     private ActivityMode mode = ActivityMode.CREATE;
     @Getter
     private Food food;
-
+    NutrientService nutrientService = NutrientService.getInstance();
 
     @SneakyThrows
     protected void setEventHandlers(ActivityMode mode) {
@@ -50,15 +47,7 @@ public class CreateFood extends AppCompatActivity {
 
         if (mode == ActivityMode.CREATE) {
             binding.confirmButton.setOnClickListener(view -> {
-                boolean validated;
-
-                if(TextUtils.isEmpty(binding.calPerPortion.getText())) {
-                    validated = validate(NutrientMode.DEFAULT);
-                } else {
-                    validated = validate(NutrientMode.ALTERNATE);
-                }
-
-                if(validated) {
+                if(validate()) {
                     save();
                     CharSequence info = "Food saved";
                     Toast toast = Toast.makeText(context, info, toastDuration);
@@ -75,15 +64,7 @@ public class CreateFood extends AppCompatActivity {
                 finish();
             });
             binding.confirmButton.setOnClickListener(view -> {
-                boolean validated;
-
-                if(TextUtils.isEmpty(binding.calPerPortion.getText())) {
-                    validated = validate(NutrientMode.DEFAULT);
-                } else {
-                    validated = validate(NutrientMode.ALTERNATE);
-                }
-
-                if(validated) {
+                if(validate()) {
                     update(this.food);
                     CharSequence info = "Food saved";
                     Toast toast = Toast.makeText(context, info, toastDuration);
@@ -111,10 +92,10 @@ public class CreateFood extends AppCompatActivity {
                 @Override
                 public boolean onEditorAction(TextView textView, int i, KeyEvent keyEvent) {
 
-                    if (TextUtils.isEmpty(binding.calPerPortion.getText())) {
-                        Nutrients nutrients = new Nutrients();
+                        Food nutrients = new Food();
                         NutrientService nutrientService = NutrientService.getInstance();
 
+                        // TODO rework maybe additional constructor similar to Object.assign
                         nutrients.setName(binding.foodName.getText().toString());
                         if(binding.carbs.getText().toString().matches("[0-9]+")) {
                             nutrients.setCarbsGram(Integer.parseInt(binding.carbs.getText().toString()));
@@ -132,29 +113,8 @@ public class CreateFood extends AppCompatActivity {
                             nutrients.setGramTotal(Integer.parseInt(binding.totalSize.getText().toString()));
                         }
                         nutrientService.calculateNutrients(nutrients);
-                        autofill(nutrients, NutrientMode.DEFAULT);
+                        autofill(nutrients);
                             return true;
-                    } else {
-                        Nutrients nutrients = new Nutrients();
-                        NutrientService nutrientService = NutrientService.getInstance();
-
-                        nutrients.setName(binding.foodName.getText().toString());
-
-                        // TODO validation rework validate method which returns index or identifier of whatever input is not validated
-                        if(binding.totalSize.getText().toString().matches("[0-9]+")) {
-                            nutrients.setGramTotal(Integer.parseInt(binding.totalSize.getText().toString()));
-                        }
-                        if(binding.calPerPortion.getText().toString().matches("[0-9]+")) {
-                            nutrients.setCalPerPortion(Integer.parseInt(binding.calPerPortion.getText().toString()));
-                        }
-                        if(binding.portionSize.getText().toString().matches("[0-9]+")) {
-                            nutrients.setPortionSize(Integer.parseInt(binding.portionSize.getText().toString()));
-                        }
-
-                        nutrientService.calculateNutrients(nutrients);
-                        autofill(nutrients, NutrientMode.ALTERNATE);
-                            return true;
-                    }
                 }
             });
         });
@@ -162,7 +122,7 @@ public class CreateFood extends AppCompatActivity {
         if (bundle != null) {
             this.mode = (ActivityMode) bundle.get("mode");
             this.food = (Food) bundle.get("item");
-            this.autofill(this.food, NutrientMode.DEFAULT);
+            this.autofill(this.food);
         }
 
         if (this.mode == ActivityMode.UPDATE)
@@ -172,8 +132,10 @@ public class CreateFood extends AppCompatActivity {
     }
 
     public void save() {
-        // TODO use setters call nutrientService
-        // TODO Abstract nutrientService to efficiently produce live data to auto-fill input fields with calculated values
+
+        OpenFoodFactsService openFoodFactsService = OpenFoodFactsService.getInstance();
+
+        openFoodFactsService.getProduct(this.model.getRepo(), 20917289);
 
         Food food = new Food(
                 this.binding.foodName.getText().toString(),
@@ -183,6 +145,8 @@ public class CreateFood extends AppCompatActivity {
                 Integer.parseInt(this.binding.portionSize.getText().toString()),
                 Integer.parseInt(this.binding.totalSize.getText().toString())
         );
+
+        nutrientService.calculateNutrients(food);
 
         this.model.insert(food);
     }
@@ -201,6 +165,8 @@ public class CreateFood extends AppCompatActivity {
         updatedFood.setId(food.getId());
         Log.i("FoodID", String.valueOf(updatedFood.getId()));
 
+        nutrientService.calculateNutrients(updatedFood);
+
         this.model.update(updatedFood);
     }
 
@@ -208,8 +174,7 @@ public class CreateFood extends AppCompatActivity {
         this.model.delete(food);
     }
 
-    private void autofill(Nutrients food, NutrientMode mode) {
-        if (mode == NutrientMode.DEFAULT) {
+    private void autofill(Food food) {
             this.binding.foodName.setText(food.getName());
 
             this.binding.calPerPortion.setFocusable(false);
@@ -218,31 +183,14 @@ public class CreateFood extends AppCompatActivity {
             this.binding.totalCalories.setEnabled(false);
             this.binding.calPerPortion.setHint(String.valueOf(food.getCalPerPortion()));
             this.binding.totalCalories.setHint(String.valueOf(food.getCalTotal()));
-        } else {
-            this.binding.foodName.setText(food.getName());
-
-            this.binding.carbs.setFocusable(false);
-            this.binding.carbs.setEnabled(false);
-            this.binding.protein.setFocusable(false);
-            this.binding.protein.setEnabled(false);
-            this.binding.fat.setFocusable(false);
-            this.binding.fat.setEnabled(false);
-            this.binding.totalCalories.setFocusable(false);
-            this.binding.totalCalories.setEnabled(false);
-            this.binding.carbs.setHint(String.valueOf(food.getCarbsGram()));
-            this.binding.protein.setHint(String.valueOf(food.getProteinGram()));
-            this.binding.fat.setHint(String.valueOf(food.getFatGram()));
-            this.binding.totalCalories.setHint(String.valueOf(food.getCalTotal()));
-        }
     }
 
-    private boolean validate(NutrientMode mode) {
+    private boolean validate() {
         boolean validated = true;
         if(!this.binding.foodName.getText().toString().matches("[a-zA-Z]+")) {
             this.binding.foodName.setError("Please enter name with characters A-Z a-z");
             validated = false;
         }
-        if (mode == NutrientMode.DEFAULT) {
             this.binding.totalSize.setError(null);
             this.binding.calPerPortion.setError(null);
             this.binding.portionSize.setError(null);
@@ -266,25 +214,7 @@ public class CreateFood extends AppCompatActivity {
                 this.binding.totalSize.setError("Please enter whole number");
                 validated = false;
             }
-        } else {
-            this.binding.carbs.setError(null);
-            this.binding.protein.setError(null);
-            this.binding.fat.setError(null);
-            this.binding.portionSize.setError(null);
-            this.binding.totalSize.setError(null);
-            if (!this.binding.totalSize.getText().toString().matches("[0-9]+")) {
-                this.binding.totalSize.setError("Please enter whole number");
-                validated = false;
-            }
-            if (!this.binding.calPerPortion.getText().toString().matches("[0-9]+")) {
-                this.binding.calPerPortion.setError("Please enter cal whole number");
-                validated = false;
-            }
-            if (!this.binding.portionSize.getText().toString().matches("[0-9]+")) {
-                this.binding.portionSize.setError("Please enter whole number");
-                validated = false;
-            }
-        }
+
         return validated;
     }
 }
